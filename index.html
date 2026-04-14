@@ -248,8 +248,10 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
       btn.textContent = 'Criar conta grátis';
       return;
     }
-    setMsg('Conta criada! Redirecionando...', 'success');
-    setTimeout(() => location.href = 'app.html', 1500);
+    setMsg('Conta criada com sucesso! Faça login para continuar.', 'success');
+btn.disabled = false;
+btn.textContent = 'Criar conta grátis';
+showTab('login');
   }
 </script>
 </body>
