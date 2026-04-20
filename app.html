@@ -475,7 +475,7 @@ input[type="color"] { padding: 4px 6px; height: 36px; cursor: pointer; }
 .pix-logo { font-size:32px; margin-bottom:8px; }
 .pix-title { font-size:18px; font-weight:700; margin-bottom:4px; }
 .pix-sub { font-size:13px; color:var(--muted); margin-bottom:20px; }
-.pix-plans { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px; }
+.pix-plans { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
 .pix-plan {
   border:2px solid var(--border); border-radius:12px; padding:14px 10px;
   cursor:pointer; transition:all .15s; text-align:center;
@@ -611,17 +611,30 @@ input[type="color"] { padding: 4px 6px; height: 36px; cursor: pointer; }
     <div class="pix-title">Assinar Criattiva3D</div>
     <div class="pix-sub">Pagamento via PIX — aprovação instantânea</div>
 
-    <div class="pix-plans">
+    <div class="pix-plans" style="grid-template-columns:1fr 1fr;">
       <div class="pix-plan selected" onclick="selectPlan('mensal',this)">
         <div class="pix-plan-name">Mensal</div>
-        <div class="pix-plan-price">R$49</div>
+        <div class="pix-plan-price">R$14,99</div>
         <div class="pix-plan-period">/mês</div>
+        <div class="pix-plan-badge" style="background:rgba(107,117,146,.15);color:#6b7592;">Sem desconto</div>
+      </div>
+      <div class="pix-plan" onclick="selectPlan('trimestral',this)">
+        <div class="pix-plan-name">Trimestral</div>
+        <div class="pix-plan-price">R$13,49</div>
+        <div class="pix-plan-period">/mês · total R$40,47</div>
+        <div class="pix-plan-badge">Economize 10%</div>
+      </div>
+      <div class="pix-plan" onclick="selectPlan('semestral',this)">
+        <div class="pix-plan-name">Semestral</div>
+        <div class="pix-plan-price">R$12,29</div>
+        <div class="pix-plan-period">/mês · total R$73,75</div>
+        <div class="pix-plan-badge">Economize 18%</div>
       </div>
       <div class="pix-plan" onclick="selectPlan('anual',this)">
         <div class="pix-plan-name">Anual</div>
-        <div class="pix-plan-price">R$39</div>
-        <div class="pix-plan-period">/mês</div>
-        <div class="pix-plan-badge">Economize 20%</div>
+        <div class="pix-plan-price">R$11,24</div>
+        <div class="pix-plan-period">/mês · total R$134,91</div>
+        <div class="pix-plan-badge" style="background:rgba(0,229,160,.2);color:#00e5a0;">Melhor valor 25%</div>
       </div>
     </div>
 
@@ -3914,8 +3927,10 @@ function showTrialBanner() {
 // ========== PIX MODAL ==========
 let _selectedPlan = 'mensal';
 const PIX_KEYS = {
-  mensal: { price: 'R$ 49,00', key: '66.045.660/0001-05' },
-  anual:  { price: 'R$ 468,00', key: '66.045.660/0001-05' }
+  mensal:      { price: 'R$ 14,99',  total: 'R$ 14,99',  key: '66.045.660/0001-05' },
+  trimestral:  { price: 'R$ 13,49',  total: 'R$ 40,47',  key: '66.045.660/0001-05' },
+  semestral:   { price: 'R$ 12,29',  total: 'R$ 73,75',  key: '66.045.660/0001-05' },
+  anual:       { price: 'R$ 11,24',  total: 'R$ 134,91', key: '66.045.660/0001-05' }
 };
 
 function openPixModal() {
@@ -3929,6 +3944,8 @@ function selectPlan(plan, el) {
   document.querySelectorAll('.pix-plan').forEach(p => p.classList.remove('selected'));
   el.classList.add('selected');
   document.getElementById('pix-key-display').textContent = PIX_KEYS[plan].key;
+  const tot = document.getElementById('pix-total-display');
+  if (tot) tot.textContent = PIX_KEYS[plan].total;
 }
 function copyPixKey() {
   const key = PIX_KEYS[_selectedPlan].key;
