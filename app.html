@@ -3657,23 +3657,42 @@ document.addEventListener('DOMContentLoaded', function() {
 const AUTH_KEY = 'criattiva3d_auth';
 let _currentUser = null;
 
-// Supabase init (update with your keys)
+// Supabase init
+const SUPABASE_URL = 'https://gvtqanrlazvurrfgrjfp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2dHFhbnJsYXp2dXJyZmdyamZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMTExMTcsImV4cCI6MjA5MTY4NzExN30.PkRGx_rl58-Lsxyj4Sa1gr6T6Skfate2UYXzqOENxqQ';
 let _sb = null;
 try {
   if (window.supabase && window.supabase.createClient) {
-    // Replace with your actual Supabase URL and anon key
-    // _sb = window.supabase.createClient('YOUR_SUPABASE_URL', 'YOUR_ANON_KEY');
+    _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
-} catch(e) {}
+} catch(e) { console.warn('Supabase init error', e); }
 
 // ========== ON LOAD ==========
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+  // Check active Supabase session first
+  if (_sb) {
+    const { data: { session } } = await _sb.auth.getSession();
+    if (session) {
+      const { data: perfil } = await _sb.from('perfis').select('*').eq('id', session.user.id).single();
+      _currentUser = {
+        id: session.user.id,
+        name: perfil?.nome || session.user.email.split('@')[0],
+        email: session.user.email,
+        plan: perfil?.plano || 'trial',
+        trialExpires: perfil?.trial_expira_em || new Date(Date.now() + 7*86400000).toISOString(),
+        assinaturaAtiva: perfil?.assinatura_ativa || false
+      };
+      saveAuthLocal(_currentUser);
+      enterApp();
+      return;
+    }
+  }
+  // Fallback to localStorage
   const saved = getAuthLocal();
   if (saved) {
     _currentUser = saved;
     enterApp();
   }
-  // else auth screen is already visible (active class)
 });
 
 function getAuthLocal() {
@@ -3785,7 +3804,7 @@ function getFingerprint() {
 }
 
 // ========== SIGNUP ==========
-function doSignup() {
+async function doSignup() {
   const name  = document.getElementById('signup-name').value.trim();
   const email = document.getElementById('signup-email').value.trim().toLowerCase();
   const pass  = document.getElementById('signup-pass').value;
@@ -3822,33 +3841,63 @@ function doSignup() {
   usedFps.push(fp);
   localStorage.setItem('used_fps', JSON.stringify(usedFps));
 
-  // Create trial account
+  // Disable signup button to prevent double-click
+  const btn = document.querySelector('#auth-signup .auth-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Criando conta...'; }
+
   const trialExpires = new Date();
   trialExpires.setDate(trialExpires.getDate() + 7);
 
-  const user = {
-    name, email,
-    plan: 'trial',
-    trialExpires: trialExpires.toISOString(),
-    createdAt: new Date().toISOString(),
-    fingerprint: fp,
-    termsAcceptedAt: new Date().toISOString()
-  };
-
-  saveAuthLocal(user);
-  _currentUser = user;
-
-  // Show verify screen (in real app, send email via Supabase/Resend)
-  document.getElementById('verify-email-display').textContent = email;
-  document.querySelectorAll('.auth-form').forEach(f => f.style.display = 'none');
-  document.getElementById('auth-verify').style.display = 'flex';
-
-  // For demo: enter app after 2s (in production, wait for email confirmation)
-  setTimeout(() => enterApp(), 2000);
+  if (_sb) {
+    // Real Supabase signup
+    const { data, error } = await _sb.auth.signUp({
+      email,
+      password: pass,
+      options: { data: { nome: name, fingerprint: fp } }
+    });
+    if (error) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Criar conta grátis'; }
+      const msg = error.message.includes('already registered')
+        ? 'Este e-mail já está cadastrado. Faça login.'
+        : error.message;
+      return showErr('signup-err', msg);
+    }
+    const user = {
+      id: data.user?.id,
+      name, email,
+      plan: 'trial',
+      trialExpires: trialExpires.toISOString(),
+      createdAt: new Date().toISOString(),
+      fingerprint: fp,
+      termsAcceptedAt: new Date().toISOString()
+    };
+    saveAuthLocal(user);
+    _currentUser = user;
+    document.getElementById('verify-email-display').textContent = email;
+    document.querySelectorAll('.auth-form').forEach(f => f.style.display = 'none');
+    document.getElementById('auth-verify').style.display = 'flex';
+    if (data.session) setTimeout(() => enterApp(), 1500);
+  } else {
+    // Fallback offline
+    const user = {
+      name, email,
+      plan: 'trial',
+      trialExpires: trialExpires.toISOString(),
+      createdAt: new Date().toISOString(),
+      fingerprint: fp,
+      termsAcceptedAt: new Date().toISOString()
+    };
+    saveAuthLocal(user);
+    _currentUser = user;
+    document.getElementById('verify-email-display').textContent = email;
+    document.querySelectorAll('.auth-form').forEach(f => f.style.display = 'none');
+    document.getElementById('auth-verify').style.display = 'flex';
+    setTimeout(() => enterApp(), 1500);
+  }
 }
 
 // ========== LOGIN ==========
-function doLogin() {
+async function doLogin() {
   const email = document.getElementById('login-email').value.trim().toLowerCase();
   const pass  = document.getElementById('login-pass').value;
 
@@ -3859,22 +3908,52 @@ function doLogin() {
     return showErr('login-err', 'Muitas tentativas. Aguarde 15 minutos.');
   }
 
-  // In production: authenticate via Supabase
-  // For demo: check localStorage
-  const saved = getAuthLocal();
-  if (saved && saved.email === email) {
-    _currentUser = saved;
+  const btn = document.querySelector('#auth-login .auth-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Entrando...'; }
+
+  if (_sb) {
+    const { data, error } = await _sb.auth.signInWithPassword({ email, password: pass });
+    if (error) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Entrar'; }
+      return showErr('login-err', 'E-mail ou senha incorretos.');
+    }
+    // Load profile from DB
+    const { data: perfil } = await _sb.from('perfis').select('*').eq('id', data.user.id).single();
+    const user = {
+      id: data.user.id,
+      name: perfil?.nome || email.split('@')[0],
+      email,
+      plan: perfil?.plano || 'trial',
+      trialExpires: perfil?.trial_expira_em || new Date(Date.now() + 7*86400000).toISOString(),
+      assinaturaAtiva: perfil?.assinatura_ativa || false,
+      assinaturaExpira: perfil?.assinatura_expira || null
+    };
+    saveAuthLocal(user);
+    _currentUser = user;
+    if (btn) { btn.disabled = false; btn.textContent = 'Entrar'; }
     enterApp();
   } else {
-    showErr('login-err', 'E-mail ou senha incorretos.');
+    const saved = getAuthLocal();
+    if (saved && saved.email === email) {
+      _currentUser = saved;
+      if (btn) { btn.disabled = false; btn.textContent = 'Entrar'; }
+      enterApp();
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = 'Entrar'; }
+      showErr('login-err', 'E-mail ou senha incorretos.');
+    }
   }
 }
 
 // ========== FORGOT PASSWORD ==========
-function doForgot() {
+async function doForgot() {
   const email = document.getElementById('forgot-email').value.trim();
   if (!validateEmail(email)) return showErr('forgot-err', 'Informe um e-mail válido.');
-  // In production: call Supabase resetPasswordForEmail
+  if (_sb) {
+    await _sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/app.html'
+    });
+  }
   showToast('Link enviado! Verifique seu e-mail.', 'success');
   switchAuthTab('login');
 }
@@ -3893,7 +3972,8 @@ function enterApp() {
   showTrialBanner();
 }
 
-function logout() {
+async function logout() {
+  if (_sb) await _sb.auth.signOut();
   localStorage.removeItem(AUTH_KEY);
   _currentUser = null;
   document.getElementById('auth-screen').classList.add('active');
