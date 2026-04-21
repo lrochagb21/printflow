@@ -279,23 +279,41 @@ window.resendVerification = function() { showToast('E-mail reenviado!', 'success
 
 // ========== ENTER APP ==========
 function enterApp() {
+  // Hide auth screen
   var as = document.getElementById('auth-screen');
   if (as) as.classList.remove('active');
+  // Update user info in sidebar
   var ui = document.getElementById('user-info');
   if (ui && _currentUser) ui.textContent = _currentUser.email;
   showTrialBanner();
-  // Trigger main app initialization
-  if (typeof window._initApp === 'function') window._initApp();
+  // Activate dashboard page
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  var dash = document.getElementById('page-dashboard');
+  if (dash) dash.classList.add('active');
+  var dashNav = document.querySelector('.nav-item[data-page="dashboard"]');
+  if (dashNav) dashNav.classList.add('active');
+  // Render the dashboard and load data
+  setTimeout(function() {
+    if (typeof loadConfig === 'function') loadConfig();
+    if (typeof renderDashboard === 'function') renderDashboard();
+    if (typeof populateMesSelects === 'function') populateMesSelects();
+    if (typeof loadFromSupabase === 'function') loadFromSupabase();
+  }, 100);
 }
 
 window.logout = function() {
   if (_sb) _sb.auth.signOut();
   localStorage.removeItem(AUTH_KEY);
   _currentUser = null;
-  var as = document.getElementById('auth-screen');
-  if (as) as.classList.add('active');
+  // Hide all pages
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  // Hide trial banner
   var tb = document.getElementById('trial-banner');
   if (tb) tb.classList.remove('show');
+  // Show auth screen
+  var as = document.getElementById('auth-screen');
+  if (as) as.classList.add('active');
   window.switchAuthTab('login');
 };
 
@@ -3774,7 +3792,9 @@ async function checkAuth() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
     // Só redireciona se não estiver já no index
-    if (!location.href.includes('index.html')) location.href = 'index.html';
+    // No session - show auth screen, don't redirect
+    var as = document.getElementById('auth-screen');
+    if (as) as.classList.add('active');
     return;
   }
   SESSION = session;
