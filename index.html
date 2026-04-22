@@ -4116,20 +4116,25 @@ async function loadFromSupabase() {
     // Mapear config
     if (cfgRes.data) {
       const c = cfgRes.data;
+      // Só sobrescreve config se o Supabase tiver dados mais completos
+      // (custo_kg_filamento preenchido indica que foi salvo pelo novo código)
+      const existingCfg = _mem['config'] || {};
       _mem['config'] = {
-        filamento:   c.custo_kg_filamento || 120,
-        kwh:         c.custo_kwh          || 0.85,
-        potencia:    c.potencia_w ? c.potencia_w / 1000 : 0.250,
-        margem:      c.margem_lucro       || 30,
-        manutencao:  c.custo_fixo_hora    || 2,
-        taxaPerc:    c.taxa_perc          != null ? c.taxa_perc  : 15,
-        taxaFixa:    c.taxa_fixa          != null ? c.taxa_fixa  : 5,
-        imposto:     c.imposto            != null ? c.imposto    : 0,
-        impPreco:    c.imp_preco          || 4800,
-        impTempo:    c.imp_tempo          || 10000,
-        impManut:    c.imp_manut          || 1000,
-        plataformas: c.plataformas ? JSON.parse(c.plataformas) : ['Shopee', 'Mercado Livre', 'Amazon']
+        filamento:   c.custo_kg_filamento || existingCfg.filamento || 120,
+        kwh:         c.custo_kwh          || existingCfg.kwh       || 0.85,
+        potencia:    c.potencia_w ? c.potencia_w / 1000 : (existingCfg.potencia || 0.250),
+        margem:      c.margem_lucro       || existingCfg.margem    || 30,
+        manutencao:  c.custo_fixo_hora    || existingCfg.manutencao || 2,
+        taxaPerc:    c.taxa_perc          != null ? c.taxa_perc  : (existingCfg.taxaPerc  ?? 15),
+        taxaFixa:    c.taxa_fixa          != null ? c.taxa_fixa  : (existingCfg.taxaFixa  ?? 5),
+        imposto:     c.imposto            != null ? c.imposto    : (existingCfg.imposto   ?? 0),
+        impPreco:    c.imp_preco          || existingCfg.impPreco || 4800,
+        impTempo:    c.imp_tempo          || existingCfg.impTempo || 10000,
+        impManut:    c.imp_manut          || existingCfg.impManut || 1000,
+        plataformas: c.plataformas ? JSON.parse(c.plataformas) : (existingCfg.plataformas || ['Shopee', 'Mercado Livre', 'Amazon'])
       };
+      // Persistir no localStorage tb para manter sincronia
+      try { localStorage.setItem('p3d_config', JSON.stringify(_mem['config'])); } catch(e) {}
     }
   } catch(e) {
     console.warn('Erro ao carregar do Supabase:', e);
